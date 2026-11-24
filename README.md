@@ -1,43 +1,31 @@
 # Image Dedupe (C)
 
-Scans a folder of images and groups exact duplicates and near-duplicates
-(resized copies, or copies with a small edit like an added line).
+Finds exact duplicates and near-duplicates (resized copies, or copies with a
+small edit such as an added line) in a folder of images.
 
-## Build
+## Setup (once per machine)
 
-Keep all three files in the same folder, then:
+You need a C compiler. Nothing else: the stb headers are included in the repo.
 
-```
-gcc -O2 -o image_dedupe image_dedupe.c -lm
-```
+- **Linux:** `sudo apt install build-essential` (or your distro's equivalent)
+- **macOS:** `xcode-select --install`
+- **Windows:** `winget install BrechtSanders.WinLibs.POSIX.UCRT`, then reopen the terminal
 
-No system image libraries needed - stb_image.h / stb_image_resize2.h are
-public-domain single-header libraries that handle decoding (JPG, PNG, BMP,
-GIF, TGA) and resizing internally.
+## Build (same command everywhere)
+
+    cc -O2 -o image_dedupe image_dedupe.c -lm
+
+(On Linux/macOS `make` does the same thing.)
 
 ## Run
 
-```
-./image_dedupe /path/to/your/folder            # default threshold: 15
-./image_dedupe /path/to/your/folder 10          # stricter matching
-```
+    ./image_dedupe /path/to/folder          # Linux / macOS
+    .\image_dedupe.exe C:\path\to\folder    # Windows PowerShell
 
-## How it works
+Optional second argument: Hamming threshold (default 15, lower = stricter).
 
-1. MD5 of raw file bytes -> catches byte-identical duplicates instantly.
-2. Perceptual hash (DCT-based pHash): each image is resized to 32x32
-   grayscale, a 2D DCT is applied, and a 64-bit fingerprint is built from
-   the low-frequency coefficients (the first/DC coefficient is dropped).
-   This fingerprint is stable under resizing and small local edits.
-3. Hamming distance between fingerprints determines similarity; images
-   within `threshold` bits of each other are grouped together
-   (transitively, via union-find), so if A~B and B~C, all three land in
-   one group even if A and C alone wouldn't match.
+## Method
 
-Tested against a synthetic set (original, exact copy, resized copy, copy
-with a small added line, copy with a large added line, and an unrelated
-image): all "same image" variants landed within Hamming distance 12 of
-each other, while the unrelated image sat at distance 30+. That gap is
-why 15 is a safe default threshold, but adjust it for your own images if
-you see false positives/negatives.
-# image-deduper
+MD5 of file bytes catches exact duplicates. A DCT-based perceptual hash
+(32x32 grayscale -> 64-bit fingerprint) plus Hamming distance catches resized
+and lightly edited copies. Supports JPG, PNG, BMP, GIF, TGA (no WEBP).

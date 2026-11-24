@@ -16,11 +16,11 @@
  *   Both must sit in the same folder as this .c file.
  *   Get them from: https://github.com/nothings/stb
  *
- * Build:
- *   gcc -O2 -o image_dedupe image_dedupe.c -lm
+ * Build (same command on Linux, macOS and Windows/MinGW):
+ *   cc -O2 -o image_dedupe image_dedupe.c -lm
  *
  * Run:
- *   ./image_dedupe <folderPath> [hammingThreshold]
+ *   ./image_dedupe <folderPath> [hammingThreshold]      (Windows PowerShell: .\image_dedupe.exe ...)
  *
  * Example:
  *   ./image_dedupe ./photos 15
@@ -42,10 +42,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>   /* strcasecmp (Linux, macOS, MinGW) */
 #include <stdint.h>
 #include <math.h>
 #include <dirent.h>
 #include <sys/stat.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #define HASH_SIZE 32   /* image is resized to HASH_SIZE x HASH_SIZE grayscale before DCT */
 #define HASH_BITS 8    /* we keep an 8x8 low-frequency block -> 64 bit hash */
