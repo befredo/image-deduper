@@ -1,36 +1,29 @@
 /*
- * image_dedupe.c
- *
- * Scans a folder of images and groups together:
- *   - exact duplicates (identical bytes)
- *   - near-duplicates (same image resized, or with a small edit like an added line)
- *
- * Method:
- *   1. MD5 hash of file bytes -> instantly catches exact duplicates.
- *   2. Perceptual hash (pHash, DCT-based) -> catches resized / lightly edited
- *      versions of the same image, compared using Hamming distance.
- *
- * Dependencies (header-only, no system libs/linking needed):
- *   stb_image.h          - image decoding (JPG, PNG, BMP, GIF, TGA, ...)
- *   stb_image_resize2.h  - high quality image resizing
- *   Both must sit in the same folder as this .c file.
- *   Get them from: https://github.com/nothings/stb
- *
- * Build (same command on Linux, macOS and Windows/MinGW):
- *   cc -O2 -o image_dedupe image_dedupe.c -lm
- *
- * Run:
- *   ./image_dedupe <folderPath> [hammingThreshold]      (Windows PowerShell: .\image_dedupe.exe ...)
- *
- * Example:
- *   ./image_dedupe ./photos 15
- *
- * hammingThreshold (default 15): max number of differing bits (out of 64)
- * for two images to be considered "similar". Lower = stricter.
- *   0-5    -> nearly identical (resize / recompression only)
- *   6-15   -> similar with minor edits (e.g. a small added line, light crop)
- *   16-20  -> looser match, may start including different-but-similar images
- *   21+    -> generally different images
+
+  Scans a folder of images and groups together:
+    - exact duplicates (identical bytes)
+    - near-duplicates (same image resized, or with a small edit)
+
+  Dependencies (header-only, no system libs/linking needed):
+    stb_image.h          - image decoding (JPG, PNG, BMP, GIF, TGA, ...)
+    stb_image_resize2.h  - high quality image resizing
+    from: https://github.com/nothings/stb
+ 
+  Build (same command on Linux, macOS and Windows/MinGW):
+    gcc -O2 -o image_dedupe image_dedupe.c -lm
+ 
+  Run:
+    ./image_dedupe <folderPath> [hammingThreshold]      (Windows: .\image_dedupe.exe ...)
+ 
+  Example:
+    ./image_dedupe ./photos 15
+ 
+  hammingThreshold (default 15): max number of differing bits (out of 64)
+  for two images to be considered "similar". Lower = stricter.
+    0-5    ---> nearly identical (resize / recompression only)
+    6-15   ---> similar with minor edits (e.g. a small added line, light crop)
+    16-20  ---> looser match, may start including different-but-similar images
+    21+    ---> generally different images
  */
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -42,7 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>   /* strcasecmp (Linux, macOS, MinGW) */
+#include <strings.h>
 #include <stdint.h>
 #include <math.h>
 #include <dirent.h>
@@ -52,13 +45,12 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define HASH_SIZE 32   /* image is resized to HASH_SIZE x HASH_SIZE grayscale before DCT */
-#define HASH_BITS 8    /* we keep an 8x8 low-frequency block -> 64 bit hash */
-#define HASH_LEN (HASH_BITS * HASH_BITS - 1) /* 63 bits: 8x8 block minus the DC term */
+#define HASH_SIZE 32
+#define HASH_BITS 8
+#define HASH_LEN (HASH_BITS * HASH_BITS - 1)
 #define MAX_FILES 4096
 #define MAX_PATH_LEN 1024
 
-/* ---------- Minimal MD5 implementation (RFC 1321) ---------- */
 
 typedef struct {
     uint32_t state[4];
@@ -126,7 +118,7 @@ static void md5_file(const char *path, unsigned char digest_out[16]) {
         total_len += 64;
     }
 
-    /* last partial block + padding */
+
     unsigned char pad[128];
     memset(pad, 0, sizeof(pad));
     memcpy(pad, block, n);
@@ -159,7 +151,7 @@ static void md5_to_hex(const unsigned char digest[16], char out[33]) {
     out[32] = '\0';
 }
 
-/* ---------- DCT-based perceptual hash ---------- */
+
 
 static void dct_1d(const double *in, double *out, int n) {
     for (int k = 0; k < n; k++) {
@@ -175,14 +167,12 @@ static void dct_2d(double matrix[HASH_SIZE][HASH_SIZE], double out[HASH_SIZE][HA
     double rows_dct[HASH_SIZE][HASH_SIZE];
     double in_buf[HASH_SIZE], out_buf[HASH_SIZE];
 
-    /* DCT on rows */
     for (int r = 0; r < HASH_SIZE; r++) {
         for (int c = 0; c < HASH_SIZE; c++) in_buf[c] = matrix[r][c];
         dct_1d(in_buf, out_buf, HASH_SIZE);
         for (int c = 0; c < HASH_SIZE; c++) rows_dct[r][c] = out_buf[c];
     }
 
-    /* DCT on columns */
     for (int c = 0; c < HASH_SIZE; c++) {
         for (int r = 0; r < HASH_SIZE; r++) in_buf[r] = rows_dct[r][c];
         dct_1d(in_buf, out_buf, HASH_SIZE);
@@ -196,10 +186,9 @@ static int compare_doubles(const void *a, const void *b) {
     return (da > db) - (da < db);
 }
 
-/* Returns 1 on success, 0 on failure (unreadable/unsupported image). */
 static int perceptual_hash(const char *path, char hash_out[HASH_LEN + 1]) {
     int width, height, channels;
-    unsigned char *data = stbi_load(path, &width, &height, &channels, 1 /* force grayscale */);
+    unsigned char *data = stbi_load(path, &width, &height, &channels, 1);
     if (!data) return 0;
 
     unsigned char *resized = (unsigned char *)malloc(HASH_SIZE * HASH_SIZE);
@@ -223,7 +212,7 @@ static int perceptual_hash(const char *path, char hash_out[HASH_LEN + 1]) {
     int idx = 0;
     for (int y = 0; y < HASH_BITS; y++) {
         for (int x = 0; x < HASH_BITS; x++) {
-            if (x == 0 && y == 0) continue; /* skip DC term */
+            if (x == 0 && y == 0) continue;
             low_freq[idx++] = dct_out[y][x];
         }
     }
@@ -248,7 +237,6 @@ static int hamming_distance(const char *a, const char *b) {
     return dist;
 }
 
-/* ---------- Union-Find to group images transitively ---------- */
 
 static int uf_parent[MAX_FILES];
 
@@ -269,7 +257,6 @@ static void uf_union(int a, int b) {
     if (rootA != rootB) uf_parent[rootA] = rootB;
 }
 
-/* ---------- File collection ---------- */
 
 static int has_image_extension(const char *name) {
     const char *exts[] = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tga", NULL};
@@ -307,7 +294,6 @@ static int collect_image_files(const char *folder, char paths[MAX_FILES][MAX_PAT
     return count;
 }
 
-/* ---------- Main ---------- */
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -336,7 +322,6 @@ int main(int argc, char **argv) {
         md5_to_hex(digest, md5_hex[i]);
     }
 
-    /* Step 2: perceptual hash for near-duplicate detection */
     static char phash[MAX_FILES][HASH_LEN + 1];
     static int phash_ok[MAX_FILES];
     for (int i = 0; i < n; i++) {
@@ -356,7 +341,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* ---------- Report: exact duplicates ---------- */
 
     printf("=== Exact duplicates (identical files) ===\n");
     static int md5_reported[MAX_FILES];
@@ -381,7 +365,6 @@ int main(int argc, char **argv) {
     }
     if (!exact_found) printf("  None found.\n\n");
 
-    /* ---------- Report: near-duplicate groups ---------- */
 
     printf("=== Similar / near-duplicate groups (Hamming distance <= %d) ===\n", threshold);
     static int group_reported[MAX_FILES];

@@ -1,19 +1,23 @@
-# Image Dedupe (C)
+# Image Dedupe
 
-Finds exact duplicates and near-duplicates (resized copies, or copies with a
+I download a lot of images that I think will be useful for my D&D campaign, and often find myself with the same image downloaded more than once, so I wanted to have a tool that helped me take out the duplicates of the same image.
+The program finds exact and near duplicates (resized copies, or copies with a
 small edit such as an added line) in a folder of images.
 
-## Setup (once per machine)
+- [ ] Create a folder with the copies
+- [ ] Give the option to look at the copies and delete them
 
-You need a C compiler. Nothing else: the stb headers are included in the repo.
+## Setup
 
-- **Linux:** `sudo apt install build-essential` (or your distro's equivalent)
+You need a C compiler.
+
+- **Linux:** `sudo apt install build-essential`
 - **macOS:** `xcode-select --install`
-- **Windows:** `winget install BrechtSanders.WinLibs.POSIX.UCRT`, then reopen the terminal
+- **Windows:** `winget install BrechtSanders.WinLibs.POSIX.UCRT`
 
-## Build (same command everywhere)
+## Build
 
-    cc -O2 -o image_dedupe image_dedupe.c -lm
+    gcc -O2 -o image_dedupe image_dedupe.c -lm
 
 (On Linux/macOS `make` does the same thing.)
 
